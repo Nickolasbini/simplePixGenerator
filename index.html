@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>PIX Oficial - CódigoPrático</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f2f5; }
+        .box { background: #fff; padding: 20px; border-radius: 10px; display: inline-block; width: 350px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input { width: 90%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
+        button { width: 95%; padding: 12px; background: #00bfa5; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #qrcode { margin: 20px auto; display: flex; justify-content: center; }
+        textarea { width: 90%; height: 60px; margin-top: 10px; font-size: 11px; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Gerador PIX</h2>
+    <input type="text" id="chave" placeholder="Chave (Ex: 12345678900 ou email)">
+    <input type="text" id="nome" placeholder="Nome do Recebedor (Sem acento)">
+    <input type="text" id="cidade" placeholder="Cidade (Sem acento)">
+    <input type="text" id="valor" placeholder="Valor (Ex: 10.00)">
+    <button onclick="generate()">GERAR QR CODE</button>
+    
+    <div id="qrcode"></div>
+    <textarea id="copy" readonly></textarea>
+</div>
+
+<script>
+function generate() {
+    const chave = document.getElementById('chave').value.trim();
+    const nome = document.getElementById('nome').value.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const cidade = document.getElementById('cidade').value.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const valor = parseFloat(document.getElementById('valor').value.replace(',', '.')).toFixed(2);
+
+    function format(id, content) {
+        const size = content.length.toString().padStart(2, '0');
+        return id + size + content;
+    }
+
+    const gui = "0014BR.GOV.BCB.PIX";
+    const key = format("01", chave);
+    const merchantAccount = format("26", gui + key);
+
+    let payload = "000201"; // Versão do Payload
+    payload += merchantAccount;
+    payload += "52040000"; // Merchant Category Code
+    payload += "5303986"; // BRL
+    payload += format("54", valor); // Valor da transação
+    payload += "5802BR"; // Country Code
+    payload += format("59", nome); // Nome do recebedor
+    payload += format("60", cidade); // Cidade
+    payload += "62070503***"; // Campo 62 (Opcional - Transaction ID)
+    payload += "6304"; // Indicador do CRC16
+
+    // Cálculo do CRC16 (CRC-CCITT / XMODEM)
+    const crc = computeCRC16(payload);
+    const finalPayload = payload + crc.toUpperCase();
+
+    document.getElementById('copy').value = finalPayload;
+    document.getElementById('qrcode').innerHTML = "";
+    new QRCode(document.getElementById("qrcode"), {
+        text: finalPayload,
+        width: 200,
+        height: 200
+    });
+}
+
+function computeCRC16(data) {
+    let crc = 0xFFFF;
+    for (let i = 0; i < data.length; i++) {
+        crc ^= data.charCodeAt(i) << 8;
+        for (let j = 0; j < 8; j++) {
+            if ((crc & 0x8000) !== 0) {
+                crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+            } else {
+                crc = (crc << 1) & 0xFFFF;
+            }
+        }
+    }
+    return crc.toString(16).padStart(4, '0');
+}
+</script>
+
+</body>
+</html>
